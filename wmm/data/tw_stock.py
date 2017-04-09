@@ -2,6 +2,8 @@
 
 import urllib.request
 import urllib3
+import io
+import csv
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
@@ -52,9 +54,21 @@ class TwStock:
                     continue
 
                 utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')
-                print(utfCsv.decode('utf-8', 'ignore'))
-                #print(result.data.decode('big5', 'ignore'))
-                    
+                
+                reader = csv.reader(io.StringIO(utfCsv.decode('utf-8', 'ignore')))
+                startRowFlag = False
+                for row in reader:
+                    if startRowFlag == False:
+                        if '證券代號' in row:
+                            startRowFlag = True
+                            continue
+                    else:
+                        fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]
+                        print(fixedRow)
+                        
+                        if fixedRow[0] == '':
+                            break
+                        
                 startTime = startTime + timedelta(days = 1)
                 
             
