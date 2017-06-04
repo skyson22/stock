@@ -9,13 +9,16 @@ import json
 import os
 import psutil
 import subprocess
+import re
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
+from pymongo import MongoClient
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
     twOtcUrl = 'http://www.otc.org.tw'
+    collectTitle = "daily"
     timeZone = 8
     
     twStockUrl = 'http://www.twse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php'
@@ -39,6 +42,9 @@ class TwStock:
         if self.urlTwseLive() != True:
             return False
         
+        client = MongoClient()
+        db = client.twStock
+        
         if False:#self.__twseDataBaseExist():
             pass
         else:
@@ -49,14 +55,12 @@ class TwStock:
                 if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':
                     startTime = startTime + timedelta(days = 1)
                     continue
-                                
-                twTimeFormat = date(startTime.year - 1911, startTime.month, startTime.day)
-                print(twTimeFormat)        
-                result = twseConn.request('POST',
-                        '/ch/trading/exchange/MI_INDEX/MI_INDEX.php',
-                        fields={'download': 'csv',
-                                'qdate': twTimeFormat.strftime("%Y/%m/%d"),
-                                'selectType': 'ALL'})
+                                       
+                result = twseConn.request('GET',
+                        '/exchangeReport/MI_INDEX',
+                        fields={'response': 'csv',
+                                'date': startTime.strftime("%Y%m%d"),
+                                'type': 'ALL'})
                 
                 if result.status != 200:
                     continue
@@ -65,32 +69,26 @@ class TwStock:
                 
                 reader = csv.reader(io.StringIO(utfCsv.decode('utf-8', 'ignore')))
                 startRowFlag = False
-                breakNowFlag = 0
+                                
+                print(startTime)
                 
                 for row in reader:
                     if startRowFlag == False:                   
                         for colume in row:                                   
-                            if '查無資料' in colume:
-                                breakNowFlag = 1
-                                break
-                            elif '證券代號' in colume:
+                            if '證券代號' in colume:
                                 startRowFlag = True
-                                break
-                        
-                        if breakNowFlag == 1:
-                            #need to tell database no data
-                            break
-                            
-                        
-                    else:
-                        fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]
-                        print(fixedRow)
-                        
-                        if fixedRow[0] == '':
+                                break                            
+                    else:   
+                        if '備註' in row[0]:
                             break
                         
-                                         
+                        fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]                                                          
                         stId = fixedRow[0]              #證券代號
+                        
+                        ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
+                        if ret == None:
+                            continue
+                                                                  
                         stChName = fixedRow[1]          #證券名稱
                         stOverShares = fixedRow[2]      #成交股數
                         stTradingVol = fixedRow[3]      #成交筆數
@@ -101,9 +99,30 @@ class TwStock:
                         stClosePrice = fixedRow[8]      #收盤價
                         stPER = fixedRow[15]            #本益比
                         
-
-                        break
+                        collectName = self.collectTitle + stId
+                        collection = db[collectName]
+                                          
+                        timeData = {  'time':startTime.strftime("%Y%m%d"),
+                                      'stockOpen':1,
+                                      'overShares':stOverShares,
+                                      'tradingVol':stTradingVol,
+                                      'overMoney':stOverMoney,
+                                      'openPrice':stOpenPrice,
+                                      'dayHightPrice':stDayHighPrice,
+                                      'dayLowPrice':stDayLowPrice,
+                                      'closePrice':stClosePrice,
+                                      'per':stPER}
                         
+                        if collection.count() == 0:
+                            stockDailyData = {'id':stId,
+                                     'name':stChName,
+                                     'date':[timeData]
+                            }
+                            collection.insert(stockDailyData)
+       
+                        else:
+                            collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
+                               
                 startTime = startTime + timedelta(days = 1)
                 
             
@@ -123,7 +142,7 @@ class TwStock:
                 p.terminate()
             
         self.mongodbServer = subprocess.Popen(
-            "mongod --dbpath {0} --logpath {1}".format(self.mongodbDirName, self.mongodbDirName),
+            "mongod --dbpath {0} --logpath {1}".format(self.mongodbDirName, self.mongodbDirName + '\log'),
             shell=True
         )
         
@@ -138,10 +157,10 @@ class TwStock:
             self.mongodbServer.terminate()
                   
     def updateDB(self):
-        #if self.__startMongoDbServer() == False:
-        #    return False
+        if self.__startMongoDbServer() == False:
+            return False
         self.__getDailyTradeDataFromTwse()
-        #self.__stopMongoDbServer()
+        self.__stopMongoDbServer()
 
     def urlTwseLive(self):
         with urllib.request.urlopen(self.twTwseUrl) as f:
