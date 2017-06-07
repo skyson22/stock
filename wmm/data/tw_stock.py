@@ -10,10 +10,11 @@ import os
 import psutil
 import subprocess
 import re
+import pprint
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
-from pymongo import MongoClient
+from pymongo import MongoClient, collection
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
@@ -30,7 +31,7 @@ class TwStock:
     db = None
     client = None
     dbTitle = 'twStcok'
-    collectTitle = 'daily'
+    collectTitle = 'stockDaily'
     stopTradeDateTitle = 'noTrade'
     
     def __init__(self):
@@ -71,7 +72,7 @@ class TwStock:
             
             startRowFlag = False
                             
-            print(startTime)
+            print(startTime,'-csv downing')
             
             for row in reader:
                 if startRowFlag == False:                   
@@ -100,9 +101,6 @@ class TwStock:
                     stClosePrice = fixedRow[8]      #收盤價
                     stPER = fixedRow[15]            #本益比
                     
-                    collectName = self.collectTitle + stId
-                    collection = self.db[collectName]
-                                      
                     timeData = {  'time':startTime.strftime("%Y%m%d"),
                                   'stockOpen':1,
                                   'overShares':stOverShares,
@@ -114,18 +112,19 @@ class TwStock:
                                   'closePrice':stClosePrice,
                                   'per':stPER}
                     
-                    if collection.count() == 0:
+                    collection = self.db[self.collectTitle]
+                    
+                    if collection.find({'id':stId}).count() == 0:
                         stockDailyData = {'id':stId,
                                  'name':stChName,
                                  'date':[timeData]
                         }
                         collection.insert(stockDailyData)
-   
                     else:
                         collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
-                           
-            startTime = startTime + timedelta(days = 1)           
-
+                              
+            startTime = startTime + timedelta(days = 1)
+                    
     def __parseRawData(self):
         pass
     
@@ -177,8 +176,16 @@ class TwStock:
             else:
                 return False
             
-    def getDataFromDB(self, ID, date):
-        pass
+    def getDailyDataFromDB(self, ID):
+        if self.__startMongoDbServer() == False:
+            return False
+        
+        if self.db[self.collectTitle].find({'id':ID}).count() > 0:
+            return self.db[self.collectTitle].find_one({'id': ID})
+        else:
+            return None;
+             
+        self.__stopMongoDbServer()
     
     def delDataFromDB(self):
         pass
@@ -197,4 +204,5 @@ class TwStock:
     
 if __name__ == "__main__":
     test = TwStock()
-    start_time = test.updateDB()
+    #start_time = test.updateDB()
+    test.getDailyDataFromDB('0050', '20160601')
