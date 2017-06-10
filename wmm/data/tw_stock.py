@@ -10,11 +10,14 @@ import os
 import psutil
 import subprocess
 import re
+import time
 import pprint
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
 from pymongo import MongoClient, collection
+from asyncio.tasks import sleep
+from test.test__locale import candidate_locales
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
@@ -41,8 +44,8 @@ class TwStock:
         pass
     
     def __twseDataBaseExist(self):
-        pass    
-        
+        pass
+           
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
             return False
@@ -51,7 +54,16 @@ class TwStock:
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():
-            if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':
+            if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':                
+                collection = self.db[self.stopTradeDateTitle]
+                data = {'time':startTime.strftime("%Y%m%d")}
+                
+                if collection.count() == 0:
+                    noTradeDate ={'type':'noTrade','date':[data]}
+                    collection.insert(noTradeDate)
+                else:
+                    collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
+                    
                 startTime = startTime + timedelta(days = 1)
                 continue
                                    
@@ -62,9 +74,15 @@ class TwStock:
                             'type': 'ALL'})
             
             if result.status != 200:
-                collection = self.db[self.stopTradeDateTitle]                    
+                collection = self.db[self.stopTradeDateTitle]
                 data = {'time':startTime.strftime("%Y%m%d")}
-                collection.insert(data)
+                
+                if collection.count() == 0:
+                    noTradeDate ={'type':'noTrade','date':[data]}
+                    collection.insert(noTradeDate)
+                else:
+                    collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
+                                                                            
                 continue
 
             utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
@@ -181,11 +199,12 @@ class TwStock:
             return False
         
         if self.db[self.collectTitle].find({'id':ID}).count() > 0:
-            return self.db[self.collectTitle].find_one({'id': ID})
+            data = self.db[self.collectTitle].find_one({'id': ID})
+            self.__stopMongoDbServer()
+            return data
         else:
+            self.__stopMongoDbServer()
             return None;
-             
-        self.__stopMongoDbServer()
     
     def delDataFromDB(self):
         pass
@@ -193,16 +212,21 @@ class TwStock:
     def updateStockDB(self):
         pass
     
-    def twseOpen(self, date):
-        pass
+    def getTwseOpenData(self):
+        if self.__startMongoDbServer() == False:
+            return False
+        
+        data = self.db[self.stopTradeDateTitle].find_one()
+            
+        self.__stopMongoDbServer()
+        return data
     
     def getTwTime(self):
         return (datetime.utcnow() + timedelta(hours = self.timeZone))
 
-    def getTodayTickData(self):
-        pass
-    
+
 if __name__ == "__main__":
     test = TwStock()
     #start_time = test.updateDB()
-    test.getDailyDataFromDB('0050', '20160601')
+    #test.getDailyDataFromDB('0050', '20160601')
+    pprint.pprint(test.getTwseOpenData())
