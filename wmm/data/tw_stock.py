@@ -18,46 +18,46 @@ from datetime import date
 from pymongo import MongoClient, collection
 from asyncio.tasks import sleep
 from test.test__locale import candidate_locales
+import logging
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
     twOtcUrl = 'http://www.otc.org.tw'
-    timeZone = 8
     
     twStockUrl = 'http://www.twse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php'
     twStockTradeUrl = 'http://www.twse.com.tw/ch/trading/trading_days.php'
     
-    dataDuringYear = 1
- 
-    mongodbDirName = os.getcwd() + '\mongodb'
-    mongodbServer = None
-    db = None
-    client = None
+    mongodbDirName = os.getcwd() + '\data\mongodb'
+    
     dbTitle = 'twStcok'
     collectTitle = 'stockDaily'
     stopTradeDateTitle = 'noTrade'
     
-    def __init__(self):
-        pass
-
-    def __twseDataExist(self, date):
-        pass
+    mongodbServer = None
+    db = None
+    client = None
     
-    def __twseDataBaseExist(self):
-        pass
-           
+    timeZone = 8  
+    stockDataDuringYear = 1
+ 
+    def __init__(self, dataDuringYear = 1):
+        self.stockDataDuringYear = dataDuringYear
+        
+        if self.__startMongoDbServer() == False:
+            logging.error('mongoDB server can\'t start')
+                       
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
             return False
         
-        startTime = date(self.getTwTime().year - self.dataDuringYear, self.getTwTime().month, 1)
+        startTime = date(self.getTwTime().year - self.stockDataDuringYear, self.getTwTime().month, 1)
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():
             if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':                
-                collection = self.db[self.stopTradeDateTitle]
                 data = {'time':startTime.strftime("%Y%m%d")}
                 
+                collection = self.db[self.stopTradeDateTitle]
                 if collection.count() == 0:
                     noTradeDate ={'type':'noTrade','date':[data]}
                     collection.insert(noTradeDate)
@@ -74,9 +74,9 @@ class TwStock:
                             'type': 'ALL'})
             
             if result.status != 200:
-                collection = self.db[self.stopTradeDateTitle]
                 data = {'time':startTime.strftime("%Y%m%d")}
                 
+                collection = self.db[self.stopTradeDateTitle]
                 if collection.count() == 0:
                     noTradeDate ={'type':'noTrade','date':[data]}
                     collection.insert(noTradeDate)
@@ -142,13 +142,7 @@ class TwStock:
                         collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
                               
             startTime = startTime + timedelta(days = 1)
-                    
-    def __parseRawData(self):
-        pass
-    
-    def __saveDataToDb(self):
-        pass
-    
+                     
     def __startMongoDbServer(self):
         for pid in psutil.pids():
             p = psutil.Process(pid)
@@ -161,12 +155,11 @@ class TwStock:
         )
         
         if(self.mongodbServer == None):
-            print("mongo not install ?")
+            logging.error('mongodb server can\'t be started')
             return False
         
         self.client = MongoClient()
-        self.db = self.client[self.dbTitle]
-                 
+        self.db = self.client[self.dbTitle]          
         return True
     
     def __stopMongoDbServer(self):
@@ -175,10 +168,7 @@ class TwStock:
             self.client.close()
                   
     def updateDB(self):
-        if self.__startMongoDbServer() == False:
-            return False
         self.__getDailyTradeDataFromTwse()
-        self.__stopMongoDbServer()
 
     def urlTwseLive(self):
         with urllib.request.urlopen(self.twTwseUrl) as f:
@@ -194,36 +184,19 @@ class TwStock:
             else:
                 return False
             
-    def getDailyDataFromDB(self, ID):
-        if self.__startMongoDbServer() == False:
-            return False
-        
+    def getDailyDataFromDB(self, ID):  
         if self.db[self.collectTitle].find({'id':ID}).count() > 0:
             data = self.db[self.collectTitle].find_one({'id': ID})
-            self.__stopMongoDbServer()
             return data
         else:
-            self.__stopMongoDbServer()
             return None;
-    
-    def delDataFromDB(self):
-        pass
-    
-    def updateStockDB(self):
-        pass
-    
-    def getTwseOpenData(self):
-        if self.__startMongoDbServer() == False:
-            return False
-        
+       
+    def getTwseOpenData(self):    
         data = self.db[self.stopTradeDateTitle].find_one()
-            
-        self.__stopMongoDbServer()
         return data
     
     def getTwTime(self):
         return (datetime.utcnow() + timedelta(hours = self.timeZone))
-
 
 if __name__ == "__main__":
     test = TwStock()
