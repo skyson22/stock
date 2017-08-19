@@ -161,13 +161,13 @@ class TwStock:
             self.mongodbServer.terminate()
             self.client.close()
             
-    def stopTrade(self, date):
+    def __isStopTradeInMongoDB(self, date):
         data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
         if data == None:
             return False
         return True
     
-    def isSavedInMongoDB(self, ID, date):
+    def __isSavedInMongoDB(self, ID, date):
         data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
         if data == None:
             return False  
