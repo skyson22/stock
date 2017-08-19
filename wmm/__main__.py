@@ -10,7 +10,6 @@ def initLogging():
      
 def main():
     initLogging()
-
     test = TwStock()
     test.updateDB()
 

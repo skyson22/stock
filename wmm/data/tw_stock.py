@@ -40,6 +40,16 @@ class TwStock:
         
         if self.__startMongoDbServer() == False:
             logging.error('mongoDB server can\'t start')
+            
+    def __updateNoTradeMongoDb(self, date):
+        print('not save=',date)
+        data = {'time':date}
+        collection = self.db[self.stopTradeDateTitle]
+        if collection.count() == 0:
+            noTradeDate ={'type':'noTrade','date':[data]}
+            collection.insert(noTradeDate)
+        else:
+            collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
                        
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
@@ -48,36 +58,31 @@ class TwStock:
         startTime = date(self.getTwTime().year - self.stockDataDuringYear, self.getTwTime().month, 1)
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
-        while startTime != self.getTwTime().date():
+        while startTime != self.getTwTime().date():            
+            saveTimeFormat = startTime.strftime("%Y%m%d")
+            
+            if self.__isStopTradeInMongoDB(saveTimeFormat) == True:
+                startTime = startTime + timedelta(days = 1)
+                continue
+            
+            if self.__isSavedInMongoDB('0050', saveTimeFormat) == True:
+                startTime = startTime + timedelta(days = 1)
+                continue
+            
             if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':                
-                data = {'time':startTime.strftime("%Y%m%d")}
-                
-                collection = self.db[self.stopTradeDateTitle]
-                if collection.count() == 0:
-                    noTradeDate ={'type':'noTrade','date':[data]}
-                    collection.insert(noTradeDate)
-                else:
-                    collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
-                    
+                self.__updateNoTradeMongoDb(saveTimeFormat)
                 startTime = startTime + timedelta(days = 1)
                 continue
                                    
             result = twseConn.request('GET',
                     '/exchangeReport/MI_INDEX',
                     fields={'response': 'csv',
-                            'date': startTime.strftime("%Y%m%d"),
+                            'date': saveTimeFormat,
                             'type': 'ALL'})
             
-            if result.status != 200:
-                data = {'time':startTime.strftime("%Y%m%d")}
-                
-                collection = self.db[self.stopTradeDateTitle]
-                if collection.count() == 0:
-                    noTradeDate ={'type':'noTrade','date':[data]}
-                    collection.insert(noTradeDate)
-                else:
-                    collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
-                                                                            
+            if result.status != 200:    
+                self.__updateNoTradeMongoDb(saveTimeFormat)
+                startTime = startTime + timedelta(days = 1)                                                            
                 continue
 
             utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
@@ -85,7 +90,8 @@ class TwStock:
             
             startRowFlag = False
             
-            logging.debug(startTime,'-csv downing')             
+            logging.debug('csv download ={}'.format(saveTimeFormat))
+            print('save=',saveTimeFormat)             
             
             for row in reader:
                 if startRowFlag == False:                   
@@ -114,7 +120,7 @@ class TwStock:
                     stClosePrice = fixedRow[8]      #收盤價
                     stPER = fixedRow[15]            #本益比
                     
-                    timeData = {  'time':startTime.strftime("%Y%m%d"),
+                    timeData = {  'time':saveTimeFormat,
                                   'overShares':stOverShares,
                                   'tradingVol':stTradingVol,
                                   'overMoney':stOverMoney,
@@ -202,7 +208,7 @@ class TwStock:
                 
     def getTwTime(self):
         return (datetime.utcnow() + timedelta(hours = self.timeZone))
-
+    
 if __name__ == "__main__":
     test = TwStock()
     #start_time = test.updateDB()
