@@ -4,20 +4,15 @@ import urllib.request
 import urllib3
 import io
 import csv
-import pymongo
-import json
 import os
 import psutil
 import subprocess
 import re
-import time
 import pprint
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
 from pymongo import MongoClient, collection
-from asyncio.tasks import sleep
-from test.test__locale import candidate_locales
 import logging
 
 class TwStock:
@@ -89,8 +84,8 @@ class TwStock:
             reader = csv.reader(io.StringIO(utfCsv.decode('utf-8', 'ignore')))
             
             startRowFlag = False
-                            
-            print(startTime,'-csv downing')
+            
+            logging.debug(startTime,'-csv downing')             
             
             for row in reader:
                 if startRowFlag == False:                   
@@ -183,17 +178,16 @@ class TwStock:
             else:
                 return False
             
-    def getDailyDataFromDB(self, ID):  
-        if self.db[self.collectTitle].find({'id':ID}).count() > 0:
-            data = self.db[self.collectTitle].find_one({'id': ID})
-            return data
+    def getDailyDataFromDB(self, ID, date="00000000"):
+        if date != "00000000":            
+            data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
+            if data == None:
+                return self.db[self.collectTitle].find_one({'id': ID},{'date':{'$elemMatch':{'time':date}}})  
+            else:          
+                return None;      
         else:
-            return None;
-       
-    def getTwseOpenData(self):    
-        data = self.db[self.stopTradeDateTitle].find_one()
-        return data
-    
+            return self.db[self.collectTitle].find_one({'id': ID})  
+                
     def getTwTime(self):
         return (datetime.utcnow() + timedelta(hours = self.timeZone))
 
@@ -201,4 +195,3 @@ if __name__ == "__main__":
     test = TwStock()
     #start_time = test.updateDB()
     #test.getDailyDataFromDB('0050', '20160601')
-    pprint.pprint(test.getTwseOpenData())
