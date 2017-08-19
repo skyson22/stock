@@ -120,7 +120,6 @@ class TwStock:
                     stPER = fixedRow[15]            #本益比
                     
                     timeData = {  'time':startTime.strftime("%Y%m%d"),
-                                  'stockOpen':1,
                                   'overShares':stOverShares,
                                   'tradingVol':stTradingVol,
                                   'overMoney':stOverMoney,
