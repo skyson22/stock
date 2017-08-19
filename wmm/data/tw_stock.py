@@ -160,6 +160,18 @@ class TwStock:
         if(self.mongodbServer != None):
             self.mongodbServer.terminate()
             self.client.close()
+            
+    def stopTrade(self, date):
+        data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
+        if data == None:
+            return False
+        return True
+    
+    def isSavedInMongoDB(self, ID, date):
+        data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
+        if data == None:
+            return False  
+        return True
                   
     def updateDB(self):
         self.__getDailyTradeDataFromTwse()
@@ -182,7 +194,7 @@ class TwStock:
         if date != "00000000":            
             data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
             if data == None:
-                return self.db[self.collectTitle].find_one({'id': ID},{'date':{'$elemMatch':{'time':date}}})  
+                return self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
             else:          
                 return None;      
         else:
