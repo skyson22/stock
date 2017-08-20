@@ -84,8 +84,8 @@ class TwStock:
                 startTime = startTime + timedelta(days = 1)                                                            
                 continue
             
-            utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
-            reader = csv.reader(io.StringIO(utfCsv.decode('utf-8', 'ignore')))
+            #utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
+            reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
             
             startRowFlag = False
             
