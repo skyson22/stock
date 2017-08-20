@@ -8,7 +8,6 @@ import os
 import psutil
 import subprocess
 import re
-import pprint
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
