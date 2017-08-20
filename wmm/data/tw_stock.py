@@ -42,7 +42,6 @@ class TwStock:
             logging.error('mongoDB server can\'t start')
             
     def __updateNoTradeMongoDb(self, date):
-        print('not save=',date)
         data = {'time':date}
         collection = self.db[self.stopTradeDateTitle]
         if collection.count() == 0:
@@ -84,15 +83,14 @@ class TwStock:
                 self.__updateNoTradeMongoDb(saveTimeFormat)
                 startTime = startTime + timedelta(days = 1)                                                            
                 continue
-
+            
             utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
             reader = csv.reader(io.StringIO(utfCsv.decode('utf-8', 'ignore')))
             
             startRowFlag = False
             
             logging.debug('csv download ={}'.format(saveTimeFormat))
-            print('save=',saveTimeFormat)             
-            
+                      
             for row in reader:
                 if startRowFlag == False:                   
                     for colume in row:                                   
@@ -140,6 +138,9 @@ class TwStock:
                         collection.insert(stockDailyData)
                     else:
                         collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
+                        
+            if startRowFlag == False:
+                self.__updateNoTradeMongoDb(saveTimeFormat)
                               
             startTime = startTime + timedelta(days = 1)
                      
