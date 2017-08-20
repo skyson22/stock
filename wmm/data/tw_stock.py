@@ -196,7 +196,7 @@ class TwStock:
             else:
                 return False
             
-    def getDailyDataFromDB(self, ID, date="00000000"):
+    def getDailyDataFromMongoDB(self, ID, date="00000000"):
         if date != "00000000":            
             data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
             if data == None:
