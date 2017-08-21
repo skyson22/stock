@@ -18,9 +18,6 @@ class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
     twOtcUrl = 'http://www.otc.org.tw'
     
-    twStockUrl = 'http://www.twse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php'
-    twStockTradeUrl = 'http://www.twse.com.tw/ch/trading/trading_days.php'
-    
     mongodbDirName = os.getcwd() + '\data\mongodb'
     
     dbTitle = 'twStcok'
