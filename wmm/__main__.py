@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import pprint
 
 from wmm.data.tw_stock import TwStock
 
@@ -12,6 +13,9 @@ def main():
     initLogging()
     test = TwStock()
     test.updateDB()
+    tradeDatas = test.getAllTradeDataFromMongoDB()
+    for data in tradeDatas:
+        pprint.pprint(data)
 
 if __name__ == '__main__':
     main()

@@ -209,6 +209,9 @@ class TwStock:
     def getTwTime(self):
         return (datetime.utcnow() + timedelta(hours = self.timeZone))
     
+    def getAllTradeDataFromMongoDB(self):
+        return self.db[self.collectTitle].find()
+    
 if __name__ == "__main__":
     test = TwStock()
     #start_time = test.updateDB()
