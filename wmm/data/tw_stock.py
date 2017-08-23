@@ -45,7 +45,86 @@ class TwStock:
             collection.insert(noTradeDate)
         else:
             collection.update({'type':'noTrade'}, {'$addToSet':{'date':data}})
-                       
+            
+    def __getAllTradeFromUrl(self, twseConn, saveTimeFormat):
+        '''
+                    主要更新為每日交易資料
+        '''
+        result = twseConn.request('GET',
+                    '/exchangeReport/MI_INDEX',
+                    fields={'response': 'csv',
+                            'date': saveTimeFormat,
+                            'type': 'ALL'})
+            
+        if result.status != 200:    
+            self.__updateNoTradeMongoDb(saveTimeFormat)
+            raise Exception('the twse url can not connecting')                                                    
+                
+        reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
+        
+        startRowFlag = False
+        
+        logging.debug('csv download ={}'.format(saveTimeFormat))
+                  
+        for row in reader:
+            if startRowFlag == False:                   
+                for colume in row:                                   
+                    if '證券代號' in colume:
+                        startRowFlag = True
+                        break                            
+            else:   
+                if '備註' in row[0]:
+                    break
+                
+                fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]                                                          
+                stId = fixedRow[0]              #證券代號
+                
+                ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
+                if ret == None:
+                    continue
+                                                          
+                stChName = fixedRow[1]          #證券名稱
+                stOverShares = fixedRow[2]      #成交股數
+                stTradingVol = fixedRow[3]      #成交筆數
+                stOverMoney = fixedRow[4]       #成交金額
+                stOpenPrice = fixedRow[5]       #開盤價
+                stDayHighPrice = fixedRow[6]    #最高價
+                stDayLowPrice = fixedRow[7]     #最低價
+                stClosePrice = fixedRow[8]      #收盤價
+                stPER = fixedRow[15]            #本益比
+                
+                timeData = {  'time':saveTimeFormat,
+                              'overShares':stOverShares,
+                              'tradingVol':stTradingVol,
+                              'overMoney':stOverMoney,
+                              'openPrice':stOpenPrice,
+                              'dayHightPrice':stDayHighPrice,
+                              'dayLowPrice':stDayLowPrice,
+                              'closePrice':stClosePrice,
+                              'per':stPER}
+                
+                collection = self.db[self.collectTitle]
+                
+                if collection.find({'id':stId}).count() == 0:
+                    stockDailyData = {'id':stId,
+                             'name':stChName,
+                             'date':[timeData]
+                    }
+                    collection.insert(stockDailyData)
+                else:
+                    collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
+                    
+        if startRowFlag == False:
+            self.__updateNoTradeMongoDb(saveTimeFormat)
+            raise Exception('the csv do not have useful data')
+        
+        return True
+    def __isHoliday(self, startTime):
+        if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':                
+            self.__updateNoTradeMongoDb(startTime.strftime("%Y%m%d"))
+            raise Exception('{} is a holiday'.format(startTime.strftime("%Y%m%d")))
+        return False
+                           
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
             return False
@@ -54,91 +133,16 @@ class TwStock:
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():            
-            saveTimeFormat = startTime.strftime("%Y%m%d")
-            
-            if self.__isStopTradeInMongoDB(saveTimeFormat) == True:
+            saveTimeFormat = startTime.strftime("%Y%m%d")          
+            try:                       
+                self.__isStopTradeInMongoDB(saveTimeFormat)
+                self.__isSavedInMongoDB('0050', saveTimeFormat)
+                self.__isHoliday(startTime)
+                self.__getAllTradeFromUrl(twseConn, saveTimeFormat)
+            except Exception as mes:
+                logging.debug(mes)
+            finally:  
                 startTime = startTime + timedelta(days = 1)
-                continue
-            
-            if self.__isSavedInMongoDB('0050', saveTimeFormat) == True:
-                startTime = startTime + timedelta(days = 1)
-                continue
-            
-            if startTime.strftime("%A") == 'Saturday' or startTime.strftime("%A") == 'Sunday':                
-                self.__updateNoTradeMongoDb(saveTimeFormat)
-                startTime = startTime + timedelta(days = 1)
-                continue
-                                   
-            result = twseConn.request('GET',
-                    '/exchangeReport/MI_INDEX',
-                    fields={'response': 'csv',
-                            'date': saveTimeFormat,
-                            'type': 'ALL'})
-            
-            if result.status != 200:    
-                self.__updateNoTradeMongoDb(saveTimeFormat)
-                startTime = startTime + timedelta(days = 1)                                                            
-                continue
-            
-            #utfCsv = result.data.decode('big5', 'ignore').encode('utf-8', 'ignore')           
-            reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
-            
-            startRowFlag = False
-            
-            logging.debug('csv download ={}'.format(saveTimeFormat))
-                      
-            for row in reader:
-                if startRowFlag == False:                   
-                    for colume in row:                                   
-                        if '證券代號' in colume:
-                            startRowFlag = True
-                            break                            
-                else:   
-                    if '備註' in row[0]:
-                        break
-                    
-                    fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]                                                          
-                    stId = fixedRow[0]              #證券代號
-                    
-                    ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
-                    if ret == None:
-                        continue
-                                                              
-                    stChName = fixedRow[1]          #證券名稱
-                    stOverShares = fixedRow[2]      #成交股數
-                    stTradingVol = fixedRow[3]      #成交筆數
-                    stOverMoney = fixedRow[4]       #成交金額
-                    stOpenPrice = fixedRow[5]       #開盤價
-                    stDayHighPrice = fixedRow[6]    #最高價
-                    stDayLowPrice = fixedRow[7]     #最低價
-                    stClosePrice = fixedRow[8]      #收盤價
-                    stPER = fixedRow[15]            #本益比
-                    
-                    timeData = {  'time':saveTimeFormat,
-                                  'overShares':stOverShares,
-                                  'tradingVol':stTradingVol,
-                                  'overMoney':stOverMoney,
-                                  'openPrice':stOpenPrice,
-                                  'dayHightPrice':stDayHighPrice,
-                                  'dayLowPrice':stDayLowPrice,
-                                  'closePrice':stClosePrice,
-                                  'per':stPER}
-                    
-                    collection = self.db[self.collectTitle]
-                    
-                    if collection.find({'id':stId}).count() == 0:
-                        stockDailyData = {'id':stId,
-                                 'name':stChName,
-                                 'date':[timeData]
-                        }
-                        collection.insert(stockDailyData)
-                    else:
-                        collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
-                        
-            if startRowFlag == False:
-                self.__updateNoTradeMongoDb(saveTimeFormat)
-                              
-            startTime = startTime + timedelta(days = 1)
                      
     def __startMongoDbServer(self):
         for pid in psutil.pids():
@@ -168,13 +172,13 @@ class TwStock:
         data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
         if data == None:
             return False
-        return True
+        raise Exception('{} is stop trade'.format(date))
     
     def __isSavedInMongoDB(self, ID, date):
         data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
         if data == None:
             return False  
-        return True
+        raise Exception('{} {} is exist in MongoDB'.format(ID, date))
                   
     def updateDB(self):
         self.__getDailyTradeDataFromTwse()
