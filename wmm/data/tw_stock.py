@@ -124,6 +124,57 @@ class TwStock:
             self.__updateNoTradeMongoDb(startTime.strftime("%Y%m%d"))
             raise Exception('{} is a holiday'.format(startTime.strftime("%Y%m%d")))
         return False
+    
+    def __getSellingStockShort(self, twseConn, saveTimeFormat):
+        '''
+                    當日融券賣出與借券賣出成交量值
+        '''
+        result = twseConn.request('GET',
+                    '/exchangeReport/TWTASU',
+                    fields={'response': 'csv',
+                            'date': saveTimeFormat})
+            
+        if result.status != 200:    
+            self.__updateNoTradeMongoDb(saveTimeFormat)
+            raise Exception('the twse TWTASU url can not connecting')                                                    
+                
+        reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
+        
+        startRowFlag = False
+        
+        logging.debug('TWTASU csv download ={}'.format(saveTimeFormat))
+        
+        print(saveTimeFormat, 'gaga')
+                  
+        for row in reader:
+            if startRowFlag == False:                   
+                for colume in row:                                   
+                    if '證券名稱' in colume:
+                        startRowFlag = True
+                        break                            
+            else:   
+                if '合計' in row[0]:
+                    break
+                
+                fixedRow = [w.replace(',','').replace('=','').replace('\"','') for w in row]                                                         
+                splitList = fixedRow[0].split()
+                stId = splitList[0] #證券代號
+                
+                ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
+                if ret == None:
+                    continue
+                                                                          
+                stSellStockShortCount = fixedRow[1]          #融券賣出成交數量
+                stSellStockShortMoney = fixedRow[2]      #融券賣出成交金額
+                stStockLendCount = fixedRow[3]      #借券賣出成交數量
+                stStockLendMoney = fixedRow[4]       #借券賣出成交金額
+                                        
+                collection = self.db[self.collectTitle]
+                          
+                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.sellStockShortCount':stSellStockShortCount,
+                                                                                   'date.$.sellStockShortMoney':stSellStockShortMoney,
+                                                                                   'date.$.stockLendCount':stStockLendCount,
+                                                                                   'date.$.stockLendMoney':stStockLendMoney}})
                            
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
@@ -133,12 +184,13 @@ class TwStock:
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():            
-            saveTimeFormat = startTime.strftime("%Y%m%d")          
+            saveTimeFormat = startTime.strftime("%Y%m%d")      
             try:                       
                 self.__isStopTradeInMongoDB(saveTimeFormat)
                 self.__isSavedInMongoDB('0050', saveTimeFormat)
                 self.__isHoliday(startTime)
                 self.__getAllTradeFromUrl(twseConn, saveTimeFormat)
+                self.__getSellingStockShort(twseConn, saveTimeFormat)
             except Exception as mes:
                 logging.debug(mes)
             finally:  
