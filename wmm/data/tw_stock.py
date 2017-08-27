@@ -16,7 +16,7 @@ import logging
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
-    twOtcUrl = 'http://www.otc.org.tw'
+    twOtcUrl = 'http://www.tpex.org.tw'
     
     mongodbDirName = os.getcwd() + '\data\mongodb'
     
