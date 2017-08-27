@@ -173,7 +173,79 @@ class TwStock:
                                                                                    'date.$.sellStockShortMoney':stSellStockShortMoney,
                                                                                    'date.$.stockLendCount':stStockLendCount,
                                                                                    'date.$.stockLendMoney':stStockLendMoney}})     
-                           
+    
+    def __getInstitutionalInvestorsData(self, twseConn, saveTimeFormat):
+        '''
+                    三大法人買賣超日報
+        '''
+        result = twseConn.request('GET',
+                    '/fund/T86',
+                    fields={'response': 'csv',
+                            'date': saveTimeFormat,
+                            'selectType':'ALL'})
+            
+        if result.status != 200:    
+            self.__updateNoTradeMongoDb(saveTimeFormat)
+            raise Exception('the twse T86 url can not connecting')                                                    
+                
+        reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
+        
+        logging.debug('T86 csv download ={}'.format(saveTimeFormat))
+        
+        startRowFlag = False    
+        for row in reader:
+            if startRowFlag == False:                   
+                for colume in row:                                   
+                    if '證券代號' in colume:
+                        startRowFlag = True
+                        break                            
+            else:   
+                if '說明' in row[0]:
+                    break
+                
+                fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]
+                                                           
+                stId = fixedRow[0] #證券代號            
+                ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
+                if ret == None:
+                    continue
+                                                                          
+                stForeignInvestorsBuyStockNum = fixedRow[2]          #外資買進股數
+                stForeignInvestorsSellStockNum = fixedRow[3]      #外資賣出股數
+                stForeignInvestorsBuyOrSellStockNum = fixedRow[4]      #外資買賣超股數
+                
+                stInvestmentTrustBuyStockNum = fixedRow[5]       #投信買進股數
+                stInvestmentTrustSellStockNum = fixedRow[6]       #投信賣出股數
+                stInvestmentTrustBuyOrSellStockNum = fixedRow[7]       #投信買賣超股數
+                
+                stDealerBuyOrSellStockNum = fixedRow[8]       #自營商買賣超股數
+                
+                stDealerBuyStockNumBySelf = fixedRow[9]       #自營商買進股數(自行買賣)
+                stDealerSellStockNumBySelf = fixedRow[10]       #自營商賣出股數(自行買賣)
+                stDealerBuyOrSellStockNumBySelf = fixedRow[11]       #自營商買賣超股數(自行買賣)
+                
+                stDealerBuyStockNumHedge = fixedRow[12]       #自營商買進股數(避險)
+                stDealerSellStockNumHedge = fixedRow[13]       #自營商賣出股數(避險)
+                stDealerBuyOrSellStockNumHedge = fixedRow[14]       #自營商買賣超股數(避險)
+                
+                stInstitutionalInvestorsBuyOrSell = fixedRow[15]       #三大法人買賣超股數
+                                        
+                collection = self.db[self.collectTitle]
+                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.foreignInvestorsBuyStockNum':stForeignInvestorsBuyStockNum,
+                                                                                   'date.$.foreignInvestorsSellStockNum':stForeignInvestorsSellStockNum,
+                                                                                   'date.$.foreignInvestorsBuyOrSellStockNum':stForeignInvestorsBuyOrSellStockNum,
+                                                                                   'date.$.investmentTrustBuyStockNum':stInvestmentTrustBuyStockNum,
+                                                                                   'date.$.investmentTrustSellStockNum':stInvestmentTrustSellStockNum,
+                                                                                   'date.$.investmentTrustBuyOrSellStockNum':stInvestmentTrustBuyOrSellStockNum,
+                                                                                   'date.$.dealerBuyOrSellStockNum':stDealerBuyOrSellStockNum,
+                                                                                   'date.$.dealerBuyStockNumBySelf':stDealerBuyStockNumBySelf,
+                                                                                   'date.$.dealerSellStockNumBySelf':stDealerSellStockNumBySelf,
+                                                                                   'date.$.dealerBuyOrSellStockNumBySelf':stDealerBuyOrSellStockNumBySelf,
+                                                                                   'date.$.dealerBuyStockNumHedge':stDealerBuyStockNumHedge,
+                                                                                   'date.$.dealerSellStockNumHedge':stDealerSellStockNumHedge,
+                                                                                   'date.$.dealerBuyOrSellStockNumHedge':stDealerBuyOrSellStockNumHedge,
+                                                                                   'date.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})   
+                              
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
             return False
@@ -188,6 +260,7 @@ class TwStock:
                 self.__isHoliday(startTime)
                 self.__getAllTradeFromUrl(twseConn, saveTimeFormat)
                 self.__getSellingStockShort(twseConn, saveTimeFormat)
+                self.__getInstitutionalInvestorsData(twseConn, saveTimeFormat)
             except Exception as mes:
                 logging.debug(mes)
             finally:  
