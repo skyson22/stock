@@ -62,10 +62,9 @@ class TwStock:
                 
         reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
         
-        startRowFlag = False
-        
         logging.debug('csv download ={}'.format(saveTimeFormat))
-                  
+        
+        startRowFlag = False          
         for row in reader:
             if startRowFlag == False:                   
                 for colume in row:                                   
@@ -140,12 +139,9 @@ class TwStock:
                 
         reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
         
-        startRowFlag = False
-        
         logging.debug('TWTASU csv download ={}'.format(saveTimeFormat))
         
-        print(saveTimeFormat, 'gaga')
-                  
+        startRowFlag = False    
         for row in reader:
             if startRowFlag == False:                   
                 for colume in row:                                   
@@ -170,11 +166,10 @@ class TwStock:
                 stStockLendMoney = fixedRow[4]       #借券賣出成交金額
                                         
                 collection = self.db[self.collectTitle]
-                          
                 collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.sellStockShortCount':stSellStockShortCount,
                                                                                    'date.$.sellStockShortMoney':stSellStockShortMoney,
                                                                                    'date.$.stockLendCount':stStockLendCount,
-                                                                                   'date.$.stockLendMoney':stStockLendMoney}})
+                                                                                   'date.$.stockLendMoney':stStockLendMoney}})     
                            
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
@@ -185,7 +180,7 @@ class TwStock:
 
         while startTime != self.getTwTime().date():            
             saveTimeFormat = startTime.strftime("%Y%m%d")      
-            try:                       
+            try:
                 self.__isStopTradeInMongoDB(saveTimeFormat)
                 self.__isSavedInMongoDB('0050', saveTimeFormat)
                 self.__isHoliday(startTime)
