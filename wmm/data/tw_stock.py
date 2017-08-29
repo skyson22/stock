@@ -16,7 +16,7 @@ import logging
 
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
-    twOtcUrl = 'http://www.tpex.org.tw'
+    twTpexUrl = 'http://www.tpex.org.tw'
     
     mongodbDirName = os.getcwd() + '\data\mongodb'
     
@@ -245,7 +245,7 @@ class TwStock:
                                                                                    'date.$.dealerSellStockNumHedge':stDealerSellStockNumHedge,
                                                                                    'date.$.dealerBuyOrSellStockNumHedge':stDealerBuyOrSellStockNumHedge,
                                                                                    'date.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})   
-                              
+                   
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
             return False
@@ -312,8 +312,8 @@ class TwStock:
             else:
                 return False
             
-    def urlOtcLive(self):
-        with urllib.request.urlopen(self.twOtcUrl) as f:
+    def urlTpexLive(self):
+        with urllib.request.urlopen(self.twTpexUrl) as f:
             if f.getcode() == 200:
                 return True
             else:
