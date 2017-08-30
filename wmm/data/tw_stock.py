@@ -244,7 +244,57 @@ class TwStock:
                                                                                    'date.$.dealerBuyStockNumHedge':stDealerBuyStockNumHedge,
                                                                                    'date.$.dealerSellStockNumHedge':stDealerSellStockNumHedge,
                                                                                    'date.$.dealerBuyOrSellStockNumHedge':stDealerBuyOrSellStockNumHedge,
-                                                                                   'date.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})   
+                                                                                   'date.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})
+                
+    def __getYieldRatePERPBR(self, twseConn, saveTimeFormat):
+        '''
+                    個股日本益比、殖利率及股價淨值比
+        '''
+        result = twseConn.request('GET',
+                    '/exchangeReport/BWIBBU_d',
+                    fields={'response': 'csv',
+                            'date': saveTimeFormat,
+                            'selectType':'ALL'})
+            
+        if result.status != 200:    
+            self.__updateNoTradeMongoDb(saveTimeFormat)
+            raise Exception('the twse PERPBR url can not connecting')                                                    
+                
+        reader = csv.reader(io.StringIO(result.data.decode('big5', 'ignore')))
+        
+        logging.debug('PERPBR csv download ={}'.format(saveTimeFormat))
+        
+        startRowFlag = False
+        stYieldRateIndex = 0
+        stPBRIndex = 0     
+        for row in reader:
+            if startRowFlag == False:
+                index = 0                   
+                for colume in row:                                   
+                    if '證券代號' in colume:
+                        startRowFlag = True
+                    elif '殖利率' in colume:
+                        stYieldRateIndex = index
+                    elif '股價淨值比' in colume:
+                        stPBRIndex = index             
+                    index += 1
+            else:
+                if row[0] == "":
+                    break
+                
+                fixedRow = [w.replace('-', '').replace(' ', '').replace('=','').replace('\"','') for w in row]                                                        
+                stId = fixedRow[0] #證券代號
+                
+                ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
+                if ret == None:
+                    continue
+                                                                          
+                stYieldRate = fixedRow[stYieldRateIndex]      #殖利率(%)
+                stPBR = fixedRow[stPBRIndex]       #股價淨值比
+                                        
+                collection = self.db[self.collectTitle]
+                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.yieldRate':stYieldRate,
+                                                                                   'date.$.pBR':stPBR}})  
                    
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
@@ -261,6 +311,7 @@ class TwStock:
                 self.__getAllTradeFromUrl(twseConn, saveTimeFormat)
                 self.__getSellingStockShort(twseConn, saveTimeFormat)
                 self.__getInstitutionalInvestorsData(twseConn, saveTimeFormat)
+                self.__getYieldRatePERPBR(twseConn, saveTimeFormat)
             except Exception as mes:
                 logging.debug(mes)
             finally:  
