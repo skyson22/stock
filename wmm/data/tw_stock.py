@@ -21,7 +21,7 @@ class TwStock:
     mongodbDirName = os.getcwd() + '\data\mongodb'
     
     dbTitle = 'twStcok'
-    collectTitle = 'stockDaily'
+    collectTitle = 'stockData'
     stopTradeDateTitle = 'noTrade'
     
     mongodbServer = None
@@ -110,11 +110,11 @@ class TwStock:
                 if collection.find({'id':stId}).count() == 0:
                     stockDailyData = {'id':stId,
                              'name':stChName,
-                             'date':[timeData]
+                             'daily':[timeData]
                     }
                     collection.insert(stockDailyData)
                 else:
-                    collection.update({'id':stId}, {'$addToSet':{'date':timeData}})
+                    collection.update({'id':stId}, {'$addToSet':{'daily':timeData}})
                     
         if startRowFlag == False:
             self.__updateNoTradeMongoDb(saveTimeFormat)
@@ -169,10 +169,10 @@ class TwStock:
                 stStockLendMoney = fixedRow[4]       #借券賣出成交金額
                                         
                 collection = self.db[self.collectTitle]
-                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.sellStockShortCount':stSellStockShortCount,
-                                                                                   'date.$.sellStockShortMoney':stSellStockShortMoney,
-                                                                                   'date.$.stockLendCount':stStockLendCount,
-                                                                                   'date.$.stockLendMoney':stStockLendMoney}})     
+                collection.update({'id':stId,'daily.time':saveTimeFormat}, {'$set':{'daily.$.sellStockShortCount':stSellStockShortCount,
+                                                                                   'daily.$.sellStockShortMoney':stSellStockShortMoney,
+                                                                                   'daily.$.stockLendCount':stStockLendCount,
+                                                                                   'daily.$.stockLendMoney':stStockLendMoney}})     
     
     def __getInstitutionalInvestorsData(self, twseConn, saveTimeFormat):
         '''
@@ -231,20 +231,20 @@ class TwStock:
                 stInstitutionalInvestorsBuyOrSell = fixedRow[15]       #三大法人買賣超股數
                                         
                 collection = self.db[self.collectTitle]
-                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.foreignInvestorsBuyStockNum':stForeignInvestorsBuyStockNum,
-                                                                                   'date.$.foreignInvestorsSellStockNum':stForeignInvestorsSellStockNum,
-                                                                                   'date.$.foreignInvestorsBuyOrSellStockNum':stForeignInvestorsBuyOrSellStockNum,
-                                                                                   'date.$.investmentTrustBuyStockNum':stInvestmentTrustBuyStockNum,
-                                                                                   'date.$.investmentTrustSellStockNum':stInvestmentTrustSellStockNum,
-                                                                                   'date.$.investmentTrustBuyOrSellStockNum':stInvestmentTrustBuyOrSellStockNum,
-                                                                                   'date.$.dealerBuyOrSellStockNum':stDealerBuyOrSellStockNum,
-                                                                                   'date.$.dealerBuyStockNumBySelf':stDealerBuyStockNumBySelf,
-                                                                                   'date.$.dealerSellStockNumBySelf':stDealerSellStockNumBySelf,
-                                                                                   'date.$.dealerBuyOrSellStockNumBySelf':stDealerBuyOrSellStockNumBySelf,
-                                                                                   'date.$.dealerBuyStockNumHedge':stDealerBuyStockNumHedge,
-                                                                                   'date.$.dealerSellStockNumHedge':stDealerSellStockNumHedge,
-                                                                                   'date.$.dealerBuyOrSellStockNumHedge':stDealerBuyOrSellStockNumHedge,
-                                                                                   'date.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})
+                collection.update({'id':stId,'daily.time':saveTimeFormat}, {'$set':{'daily.$.foreignInvestorsBuyStockNum':stForeignInvestorsBuyStockNum,
+                                                                                   'daily.$.foreignInvestorsSellStockNum':stForeignInvestorsSellStockNum,
+                                                                                   'daily.$.foreignInvestorsBuyOrSellStockNum':stForeignInvestorsBuyOrSellStockNum,
+                                                                                   'daily.$.investmentTrustBuyStockNum':stInvestmentTrustBuyStockNum,
+                                                                                   'daily.$.investmentTrustSellStockNum':stInvestmentTrustSellStockNum,
+                                                                                   'daily.$.investmentTrustBuyOrSellStockNum':stInvestmentTrustBuyOrSellStockNum,
+                                                                                   'daily.$.dealerBuyOrSellStockNum':stDealerBuyOrSellStockNum,
+                                                                                   'daily.$.dealerBuyStockNumBySelf':stDealerBuyStockNumBySelf,
+                                                                                   'daily.$.dealerSellStockNumBySelf':stDealerSellStockNumBySelf,
+                                                                                   'daily.$.dealerBuyOrSellStockNumBySelf':stDealerBuyOrSellStockNumBySelf,
+                                                                                   'daily.$.dealerBuyStockNumHedge':stDealerBuyStockNumHedge,
+                                                                                   'daily.$.dealerSellStockNumHedge':stDealerSellStockNumHedge,
+                                                                                   'daily.$.dealerBuyOrSellStockNumHedge':stDealerBuyOrSellStockNumHedge,
+                                                                                   'daily.$.institutionalInvestorsBuyOrSell':stInstitutionalInvestorsBuyOrSell}})
                 
     def __getYieldRatePERPBR(self, twseConn, saveTimeFormat):
         '''
@@ -293,8 +293,8 @@ class TwStock:
                 stPBR = fixedRow[stPBRIndex]       #股價淨值比
                                         
                 collection = self.db[self.collectTitle]
-                collection.update({'id':stId,'date.time':saveTimeFormat}, {'$set':{'date.$.yieldRate':stYieldRate,
-                                                                                   'date.$.pBR':stPBR}})  
+                collection.update({'id':stId,'daily.time':saveTimeFormat}, {'$set':{'daily.$.yieldRate':stYieldRate,
+                                                                                   'daily.$.pBR':stPBR}})  
                    
     def __getDailyTradeDataFromTwse(self):
         if self.urlTwseLive() != True:
@@ -304,7 +304,7 @@ class TwStock:
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():            
-            saveTimeFormat = startTime.strftime("%Y%m%d")      
+            saveTimeFormat = startTime.strftime("%Y%m%d") 
             try:
                 self.__isStopTradeInMongoDB(saveTimeFormat)
                 self.__isHoliday(startTime)
@@ -316,7 +316,7 @@ class TwStock:
                 logging.debug(mes)
             finally:  
                 startTime = startTime + timedelta(days = 1)
-                     
+                
     def __startMongoDbServer(self):
         for pid in psutil.pids():
             p = psutil.Process(pid)
@@ -348,7 +348,7 @@ class TwStock:
         raise Exception('{} is stop trade'.format(date))
     
     def __isSavedInMongoDB(self, ID, date):
-        data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
+        data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'daily':{'$elemMatch':{'time':date}}}]})
         if data == None:
             return False  
         raise True
@@ -374,7 +374,7 @@ class TwStock:
         if date != "00000000":            
             data = self.db[self.stopTradeDateTitle].find_one({'date':{'$elemMatch':{'time':date}}})
             if data == None:
-                return self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'date':{'$elemMatch':{'time':date}}}]})
+                return self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'daily':{'$elemMatch':{'time':date}}}]})
             else:          
                 return None;      
         else:
