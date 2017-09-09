@@ -8,15 +8,42 @@ import os
 import psutil
 import subprocess
 import re
+from html.parser import HTMLParser
+from dateutil.relativedelta import relativedelta
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
 from pymongo import MongoClient, collection
 import logging
 
+class revenueDataHTMLParser(HTMLParser):
+    dataList = []
+    total = []
+    startFlag = False
+
+    def handle_data(self, data):
+        new_data = data.replace(' ','').replace(',','')   
+        ret = re.match(r'^\d{4}$', new_data) #只需要4位數的股票,權證之類不用.
+        if ret != None and self.startFlag == False:
+            self.startFlag = True
+            self.dataList.append(new_data)  
+        elif len(self.dataList) < 10 and self.startFlag == True:
+            self.dataList.append(new_data)
+        elif len(self.dataList) == 10:
+            copy_data = self.dataList[:]
+            self.total.append(copy_data)
+            self.startFlag = False
+            self.dataList[:] = []
+            
+    def getParserData(self):
+        return_list = self.total[:]
+        self.total[:] = [] 
+        return return_list
+            
 class TwStock:
     twTwseUrl = 'http://www.twse.com.tw'
     twTpexUrl = 'http://www.tpex.org.tw'
+    twRevenueDataUrl = 'http://mops.twse.com.tw/nas/t21/sii/t21sc03_'
     
     mongodbDirName = os.getcwd() + '\data\mongodb'
     
@@ -336,6 +363,54 @@ class TwStock:
         self.db = self.client[self.dbTitle]          
         return True
     
+    def __getRevenueData(self, date):
+        '''
+                    營業收入, 累計營業收入
+        '''
+        twTimeFormat = '{}_{}'.format(date.year - 1911, date.month)
+        saveTimeFormat = date.strftime("%Y%m%d") 
+        url = '{}{}_0.html'.format(self.twRevenueDataUrl, twTimeFormat)
+        http = urllib3.PoolManager()
+        r = http.request('GET', url)
+        parser = revenueDataHTMLParser()
+        parser.feed(r.data.decode('big5', 'ignore'))
+        print(date)
+        parserData = parser.getParserData()
+        
+        for w in parserData:           
+            stId = w[0] #公司代號
+            stThisMonthRevenue = w[2] #當月營收
+            stLastMonthRevenue = w[3] #上月營收
+            stLastYearTheSameMonthRevenue = w[4] #去年當月營收
+            stCompareLastMonthPercent = w[5] #上月比較增減(%)
+            stCompareLastYearTheSameMonthPerent = w[6] #去年同月增減(%)
+            stThisMonthAccumulatedRevenue = w[7] #當月累計營收
+            stLastYearTheSameMonthAccumulatedRevenue = w[8] #去年累計營收
+            stCompareLastYearAccumulatedRevenuePercent = w[9] #前期比較增減(%)
+                  
+            timeData = {  'time':saveTimeFormat,
+                          'thisMonthRevenue':stThisMonthRevenue,
+                          'lastMonthRevenue':stLastMonthRevenue,
+                          'lastYearTheSameMonthRevenue':stLastYearTheSameMonthRevenue,
+                          'compareLastMonthPercent':stCompareLastMonthPercent,
+                          'compareLastYearTheSameMonthPerent':stCompareLastYearTheSameMonthPerent,
+                          'thisMonthAccumulatedRevenue':stThisMonthAccumulatedRevenue,
+                          'lastYearTheSameMonthAccumulatedRevenue':stLastYearTheSameMonthAccumulatedRevenue,
+                          'compareLastYearAccumulatedRevenuePercent':stCompareLastYearAccumulatedRevenuePercent}
+
+            collection = self.db[self.collectTitle]
+            
+            if collection.find({'$and':[{'id':stId}, {'month':{'$exists':'true'}}]}).count() == 0:   
+                collection.update({'id':stId}, {'$set':{'month':[timeData]}})     
+            else:
+                collection.update({'id':stId}, {'$addToSet':{'month':timeData}})             
+    
+    def __getMonthData(self):
+        startTime = date(self.getTwTime().year - self.stockDataDuringYear, self.getTwTime().month, 1)
+        while startTime <= self.getTwTime().date():
+            self.__getRevenueData(startTime)
+            startTime = startTime + relativedelta(months=1)
+    
     def __stopMongoDbServer(self):
         if(self.mongodbServer != None):
             self.mongodbServer.terminate()
@@ -355,6 +430,7 @@ class TwStock:
                   
     def updateDB(self):
         self.__getDailyTradeDataFromTwse()
+        self.__getMonthData()
 
     def urlTwseLive(self):
         with urllib.request.urlopen(self.twTwseUrl) as f:
