@@ -106,7 +106,7 @@ class TwStock:
                 stId = fixedRow[0]              #證券代號
                 
                 if self.__dailyDataIsSavedInMongoDB(stId, saveTimeFormat) == True:
-                    continue
+                    raise Exception('daily have the {} data'.format(saveTimeFormat))
                 
                 ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
                 if ret == None:
@@ -387,6 +387,9 @@ class TwStock:
             stThisMonthAccumulatedRevenue = w[7] #當月累計營收
             stLastYearTheSameMonthAccumulatedRevenue = w[8] #去年累計營收
             stCompareLastYearAccumulatedRevenuePercent = w[9] #前期比較增減(%)
+            
+            if self.__monthDataIsSavedInMongoDB(stId, saveTimeFormat) == True:
+                raise Exception('month data have the {} data'.format(saveTimeFormat))
                   
             timeData = {  'time':saveTimeFormat,
                           'thisMonthRevenue':stThisMonthRevenue,
@@ -408,8 +411,12 @@ class TwStock:
     def __getMonthData(self):
         startTime = date(self.getTwTime().year - self.stockDataDuringYear, self.getTwTime().month, 1)
         while startTime <= self.getTwTime().date():
-            self.__getRevenueData(startTime)
-            startTime = startTime + relativedelta(months=1)
+            try:
+                self.__getRevenueData(startTime)
+            except Exception as mes:
+                logging.debug(mes)
+            finally:
+                startTime = startTime + relativedelta(months=1)
     
     def __stopMongoDbServer(self):
         if(self.mongodbServer != None):
@@ -424,6 +431,12 @@ class TwStock:
     
     def __dailyDataIsSavedInMongoDB(self, ID, date):
         data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'daily':{'$elemMatch':{'time':date}}}]})
+        if data == None:
+            return False  
+        raise True
+    
+    def __monthDataIsSavedInMongoDB(self, ID, date):
+        data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'month':{'$elemMatch':{'time':date}}}]})
         if data == None:
             return False  
         raise True
