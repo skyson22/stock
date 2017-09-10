@@ -105,7 +105,7 @@ class TwStock:
                 fixedRow = [w.replace(' ', '').replace('=','').replace('\"','') for w in row]                                                          
                 stId = fixedRow[0]              #證券代號
                 
-                if self.__isSavedInMongoDB(stId, saveTimeFormat) == True:
+                if self.__dailyDataIsSavedInMongoDB(stId, saveTimeFormat) == True:
                     continue
                 
                 ret = re.match(r'^\d{4}$', stId) #只需要4位數的股票,權證之類不用.
@@ -422,7 +422,7 @@ class TwStock:
             return False
         raise Exception('{} is stop trade'.format(date))
     
-    def __isSavedInMongoDB(self, ID, date):
+    def __dailyDataIsSavedInMongoDB(self, ID, date):
         data = self.db[self.collectTitle].find_one({'$and':[{'id': ID}, {'daily':{'$elemMatch':{'time':date}}}]})
         if data == None:
             return False  
