@@ -351,7 +351,7 @@ class TwStock:
                 p.terminate()
             
         self.mongodbServer = subprocess.Popen(
-            "mongod --dbpath {0} --logpath {1}".format(self.mongodbDirName, self.mongodbDirName + '\log'),
+            "mongod --dbpath {0} --logpath {1} --wiredTigerCacheSizeGB=2".format(self.mongodbDirName, self.mongodbDirName + '\log'),
             shell=True
         )
         
@@ -360,7 +360,8 @@ class TwStock:
             return False
         
         self.client = MongoClient()
-        self.db = self.client[self.dbTitle]          
+        self.client.admin.command({'setParameter': 1, 'internalQueryExecMaxBlockingSortBytes': 536870912})  
+        self.db = self.client[self.dbTitle]       
         return True
     
     def __getRevenueData(self, date):
