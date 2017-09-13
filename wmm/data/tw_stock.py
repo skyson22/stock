@@ -331,8 +331,10 @@ class TwStock:
         twseConn = urllib3.connection_from_url(self.twTwseUrl)
 
         while startTime != self.getTwTime().date():            
-            saveTimeFormat = startTime.strftime("%Y%m%d") 
-            try:
+            saveTimeFormat = startTime.strftime("%Y%m%d")
+            if self.__dailyDataIsSavedInMongoDB('0050', saveTimeFormat) == True:
+                    continue
+            try:   
                 self.__isStopTradeInMongoDB(saveTimeFormat)
                 self.__isHoliday(startTime)
                 self.__getAllTradeFromUrl(twseConn, saveTimeFormat)
@@ -412,6 +414,8 @@ class TwStock:
     def __getMonthData(self):
         startTime = date(self.getTwTime().year - self.stockDataDuringYear, self.getTwTime().month, 1)
         while startTime <= self.getTwTime().date():
+            if self.__monthDataIsSavedInMongoDB('0050',startTime.strftime("%Y%m%d")) == True:
+                continue
             try:
                 self.__getRevenueData(startTime)
             except Exception as mes:
