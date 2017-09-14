@@ -2,6 +2,7 @@
 
 import logging
 import pprint
+import cProfile
 
 from wmm.data.tw_stock import TwStock
 
@@ -11,11 +12,17 @@ def initLogging():
      
 def main():
     initLogging()
-    test = TwStock()
-    test.updateDB()
-    tradeDatas = test.getAllTradeDataFromMongoDB()
-    for data in tradeDatas:
-        pprint.pprint(data)
+    tw_stock = TwStock()
+    if tw_stock.updateDB() == True:
+        print('finish')
+        pass
+        allData = tw_stock.getAllTradeDataFromMongoDB()
+        
+        
+    #tradeDatas = test.getAllTradeDataFromMongoDB()
+    #for data in tradeDatas:
+    #    pprint.pprint(data)
 
 if __name__ == '__main__':
+    #cProfile.run("main()")
     main()

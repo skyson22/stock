@@ -16,7 +16,7 @@ from datetime import date
 from pymongo import MongoClient, collection
 import logging
 
-class revenueDataHTMLParser(HTMLParser):
+class RevenueDataHTMLParser(HTMLParser):
     dataList = []
     total = []
     startFlag = False
@@ -372,7 +372,7 @@ class TwStock:
         url = '{}{}_0.html'.format(self.twRevenueDataUrl, twTimeFormat)
         http = urllib3.PoolManager()
         r = http.request('GET', url)
-        parser = revenueDataHTMLParser()
+        parser = RevenueDataHTMLParser()
         parser.feed(r.data.decode('big5', 'ignore'))
         print(date)
         parserData = parser.getParserData()
@@ -446,6 +446,7 @@ class TwStock:
     def updateDB(self):
         self.__getDailyTradeDataFromTwse()
         self.__getMonthData()
+        return True
 
     def urlTwseLive(self):
         with urllib.request.urlopen(self.twTwseUrl) as f:
